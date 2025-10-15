@@ -1,6 +1,7 @@
 import type { GetSignedUrlConfig } from '@google-cloud/storage';
 import { Storage } from '@google-cloud/storage';
 import { pipeline } from 'node:stream/promises';
+import path from 'node:path';
 import type { DefaultOptions, File } from './types';
 import { getConfigDefaultValues, getExpires, prepareUploadFile } from './utils';
 
@@ -76,10 +77,13 @@ export default {
           return;
         }
 
-        const fileName = file.url.replace(`${baseUrl}/`, '');
+        const filePath = `${file.path ? file.path.slice(1) : file.hash}/`;
+        const extension = file.ext?.toLowerCase() || '';
+        const fileName = path.basename(file.hash);
+        const fullFileName = `${basePath}${filePath}${fileName}${extension}`;
         const bucket = GCS.bucket(config.bucketName);
         try {
-          await bucket.file(fileName).delete();
+          await bucket.file(fullFileName).delete();
         } catch (error) {
           if (error instanceof Error && 'code' in error && error.code === 404) {
             throw new Error('Remote file was not found, you may have to delete manually.');
@@ -98,8 +102,13 @@ export default {
             action: 'read',
             expires: getExpires(config.expires),
           };
-          const fileName = file.url.replace(`${baseUrl}/`, '');
-          const [url] = await GCS.bucket(config.bucketName).file(fileName).getSignedUrl(options);
+          const filePath = `${file.path ? file.path.slice(1) : file.hash}/`;
+          const extension = file.ext?.toLowerCase() || '';
+          const fileName = path.basename(file.hash);
+          const fullFileName = `${basePath}${filePath}${fileName}${extension}`;
+          const [url] = await GCS.bucket(config.bucketName)
+            .file(fullFileName)
+            .getSignedUrl(options);
           return { url };
         } catch (error) {
           // If signing fails, check if this is a credentials issue
